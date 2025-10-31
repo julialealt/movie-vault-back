@@ -1,13 +1,15 @@
-# Estágio 1: Base com Node.js e pnpm
+# Estágio 1: Base com Node.js
 FROM node:20-alpine AS base
-RUN npm install -g pnpm
+# Não precisamos mais do pnpm global
 
 # Estágio 2: Instalação de dependências
 FROM base AS deps
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
+# Correção: Copiar o package-lock.json
+COPY package.json package-lock.json ./
+# Correção: Usar o npm install
 # Instala todas as dependências, incluindo dev (necessário para tsx)
-RUN pnpm install --prod=false
+RUN npm install
 
 # Estágio 3: Build/Produção
 FROM base AS production
@@ -18,6 +20,5 @@ COPY . .
 # Expõe a porta da API
 EXPOSE 8080
 
-# Comando padrão: iniciar o servidor da API
-# O worker será iniciado com um comando diferente no docker-compose
-CMD ["pnpm", "run", "dev"]
+# Comando padrão: usa npm para rodar o script
+CMD ["npm", "run", "dev"]
