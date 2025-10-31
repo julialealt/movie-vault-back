@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { movies } from '../db/schema'
+import { logAction } from '../lib/dynamo'
 
 interface UpdateMovieRequest {
   id: string
@@ -30,6 +31,10 @@ export async function updateMovie({
     if (!currentMovie) {
       throw new Error('Movie not found')
     }
+    await logAction('UPDATE', id, {
+      id,
+      message: 'No fields provided for update.',
+    })
     return { movie: currentMovie }
   }
 
@@ -44,6 +49,11 @@ export async function updateMovie({
   }
 
   const updatedMovie = result[0]
+
+  await logAction('UPDATE', updatedMovie.id, {
+    id: updatedMovie.id,
+    updatedFields: Object.keys(valuesToUpdate),
+  })
 
   return {
     movie: updatedMovie,

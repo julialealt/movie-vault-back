@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { movies } from '../db/schema'
+import { logAction } from '../lib/dynamo'
 
 interface DeleteMovieRequest {
   id: string
@@ -19,6 +20,8 @@ export async function deleteMovie({ id }: DeleteMovieRequest) {
   }
 
   await db.delete(movies).where(eq(movies.id, id))
+
+  await logAction('DELETE', id, movieToDelete)
 
   return {
     deletedCoverKey: movieToDelete.coverKey,

@@ -1,7 +1,10 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
-import { deleteFromS3, getMovieCoverKey, uploadToS3 } from '../../lib/s3'
+import { env } from '../../env'
+import { deleteFromS3, uploadToS3 } from '../../lib/s3'
+import { publishImageForProcessing } from '../../lib/sns'
 import { updateMovie } from '../../services/update-movie'
+import { getMovieCoverKey } from '../../utils/get-movie-cover-key'
 
 export const updateMovieRoute: FastifyPluginAsyncZod = async app => {
   app.put('/movies/:movieId', async (request, reply) => {
@@ -82,6 +85,7 @@ export const updateMovieRoute: FastifyPluginAsyncZod = async app => {
       if (oldCoverKey && newCoverFileKey) {
         console.log(`Deleting old cover key: ${oldCoverKey}`)
         await deleteFromS3(oldCoverKey)
+        publishImageForProcessing(env.AWS_BUCKET_NAME, newCoverFileKey)
       }
 
       return reply.status(200).send({ movie })

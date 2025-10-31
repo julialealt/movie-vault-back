@@ -1,5 +1,6 @@
 import { db } from '../db'
 import { movies } from '../db/schema'
+import { logAction } from '../lib/dynamo'
 
 interface CreateMovieRequest {
   title: string
@@ -25,6 +26,8 @@ export async function createMovie({
     .returning()
 
   const movie = result[0]
+
+  await logAction('CREATE', movie.id, movie)
 
   return {
     movie,

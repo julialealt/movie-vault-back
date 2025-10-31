@@ -1,6 +1,8 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
+import { env } from '../../env'
 import { deleteFromS3, uploadToS3 } from '../../lib/s3'
+import { publishImageForProcessing } from '../../lib/sns'
 import { createMovie } from '../../services/create-movie'
 
 export const createMovieRoute: FastifyPluginAsyncZod = async app => {
@@ -55,6 +57,8 @@ export const createMovieRoute: FastifyPluginAsyncZod = async app => {
         coverKey: coverFileKey,
         rating,
       })
+
+      publishImageForProcessing(env.AWS_BUCKET_NAME, coverFileKey)
 
       return reply.status(201).send({ movie })
     } catch (error) {
