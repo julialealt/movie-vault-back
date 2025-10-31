@@ -21,6 +21,7 @@ interface SqsMessageBody {
 const credentials = {
   accessKeyId: env.AWS_ACCESS_KEY_ID,
   secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+  sessionToken: env.AWS_SESSION_TOKEN,
 }
 const sqsClient = new SQSClient({ region: env.AWS_REGION, credentials })
 const s3Client = new S3Client({ region: env.AWS_REGION, credentials })
