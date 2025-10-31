@@ -6,14 +6,24 @@ import {
 } from '@aws-sdk/client-s3'
 import {
   DeleteMessageCommand,
+  type Message,
   ReceiveMessageCommand,
   SQSClient,
 } from '@aws-sdk/client-sqs'
 import sharp from 'sharp'
 import { env } from './env'
 
-const sqsClient = new SQSClient({ region: env.AWS_REGION })
-const s3Client = new S3Client({ region: env.AWS_REGION })
+interface SqsMessageBody {
+  bucket: string
+  key: string
+}
+
+const credentials = {
+  accessKeyId: env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+}
+const sqsClient = new SQSClient({ region: env.AWS_REGION, credentials })
+const s3Client = new S3Client({ region: env.AWS_REGION, credentials })
 const queueUrl = env.SQS_QUEUE_URL
 
 async function streamToBuffer(stream: Readable): Promise<Buffer> {
@@ -25,54 +35,83 @@ async function streamToBuffer(stream: Readable): Promise<Buffer> {
   })
 }
 
-async function processMessage(message: any) {
-  console.log('Received message:', message.Body)
-  const body = JSON.parse(message.Body)
-  const bucket = body.bucket
-  const key = body.key
+async function processMessage(message: Message) {
+  if (!message.Body || !message.ReceiptHandle) {
+    console.error('Mensagem SQS inválida recebida (sem Body ou ReceiptHandle).')
+    return
+  }
+
+  const receiptHandle = message.ReceiptHandle
+  let body: SqsMessageBody
+  let bucket: string
+  let key: string
 
   try {
-    // 1. Baixar imagem do S3
+    body = JSON.parse(message.Body) as SqsMessageBody
+    bucket = body.bucket
+    key = body.key
+    if (!bucket || !key) {
+      throw new Error(
+        'Mensagem SQS com corpo malformado (faltando bucket ou key).'
+      )
+    }
+  } catch (error) {
+    console.error(
+      `Falha ao parsear mensagem SQS. Mensagem será deletada para evitar DLQ: ${message.Body}`,
+      error
+    )
+    const deleteMessageCmd = new DeleteMessageCommand({
+      QueueUrl: queueUrl,
+      ReceiptHandle: receiptHandle,
+    })
+    await sqsClient.send(deleteMessageCmd)
+    return
+  }
+
+  console.log(`Processando imagem: ${key}`)
+
+  try {
     const getObjectCmd = new GetObjectCommand({ Bucket: bucket, Key: key })
     const { Body } = await s3Client.send(getObjectCmd)
 
     if (!Body) {
-      throw new Error('Empty body received from S3')
+      throw new Error('Corpo da imagem do S3 está vazio')
     }
 
     const imageBuffer = await streamToBuffer(Body as Readable)
 
-    // 2. Processar imagem (exemplo: redimensionar para largura máxima de 500px)
     const processedImageBuffer = await sharp(imageBuffer)
       .resize({ width: 500 })
+      .jpeg({ quality: 80 })
       .toBuffer()
 
-    // 3. (Opcional) Fazer upload da imagem processada (ex: sobrescrever a original)
     const putObjectCmd = new PutObjectCommand({
       Bucket: bucket,
-      Key: key, // Sobrescreve a original
+      Key: key,
       Body: processedImageBuffer,
-      ContentType: 'image/jpeg', // Ou detectar/manter o original
+      ContentType: 'image/jpeg',
+      ACL: 'public-read',
     })
     await s3Client.send(putObjectCmd)
-    console.log(`Processed and re-uploaded image: ${key}`)
+    console.log(`Imagem re-processada e salva: ${key}`)
 
-    // 4. Deletar mensagem da fila SQS
     const deleteMessageCmd = new DeleteMessageCommand({
       QueueUrl: queueUrl,
-      ReceiptHandle: message.ReceiptHandle,
+      ReceiptHandle: receiptHandle,
     })
     await sqsClient.send(deleteMessageCmd)
-    console.log(`Deleted message from SQS for key: ${key}`)
+    console.log(`Mensagem SQS deletada para: ${key}`)
   } catch (error) {
-    console.error(`Error processing message for key ${key}:`, error)
-    // Implementar lógica de DLQ ou retry aqui, se necessário
+    console.error(
+      `Falha ao processar a imagem ${key}. A mensagem NÃO será deletada e voltará para a fila para nova tentativa.`,
+      error
+    )
   }
 }
 
 async function pollMessages() {
   while (true) {
-    console.log('Polling SQS for messages...')
+    console.log('Buscando mensagens SQS...')
     const receiveMessageCmd = new ReceiveMessageCommand({
       QueueUrl: queueUrl,
       MaxNumberOfMessages: 10,
@@ -82,12 +121,13 @@ async function pollMessages() {
     try {
       const { Messages } = await sqsClient.send(receiveMessageCmd)
       if (Messages && Messages.length > 0) {
+        console.log(`Recebidas ${Messages.length} mensagens.`)
         await Promise.all(Messages.map(processMessage))
       } else {
-        console.log('No messages received.')
+        console.log('Nenhuma mensagem recebida.')
       }
     } catch (error) {
-      console.error('Error polling SQS:', error)
+      console.error('Erro ao buscar mensagens SQS:', error)
       await new Promise(resolve => setTimeout(resolve, 5000))
     }
   }
