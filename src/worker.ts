@@ -48,9 +48,11 @@ async function processMessage(message: Message) {
   let key: string
 
   try {
-    body = JSON.parse(message.Body) as SqsMessageBody
+    const snsEnvelope = JSON.parse(message.Body)
+    body = JSON.parse(snsEnvelope.Message) as SqsMessageBody
     bucket = body.bucket
     key = body.key
+
     if (!bucket || !key) {
       throw new Error(
         'Mensagem SQS com corpo malformado (faltando bucket ou key).'
