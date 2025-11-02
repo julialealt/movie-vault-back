@@ -32,9 +32,13 @@ export async function logAction(
     Item: {
       logId: logId,
       timestamp: new Date().toISOString(),
-      actionType: actionType,
-      movieId: movieId,
-      details: data,
+      actionType,
+      movieId,
+      details: JSON.parse(
+        JSON.stringify(data, (_, value) =>
+          value instanceof Date ? value.toISOString() : value
+        )
+      ),
     },
   })
 

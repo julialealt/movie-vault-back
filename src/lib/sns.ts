@@ -8,7 +8,8 @@ export async function publishImageForProcessing(bucket: string, key: string) {
   const message = JSON.stringify({ bucket, key })
   const command = new PublishCommand({
     TopicArn: topicArn,
-    Message: message,
+    Message: JSON.stringify(message),
+    MessageGroupId: 'movie-events',
   })
 
   try {
