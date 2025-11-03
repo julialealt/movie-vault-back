@@ -1,24 +1,24 @@
-# Estágio 1: Base com Node.js
-FROM node:20-alpine AS base
-# Não precisamos mais do pnpm global
-
-# Estágio 2: Instalação de dependências
-FROM base AS deps
+FROM node:20-alpine AS builder
 WORKDIR /app
-# Correção: Copiar o package-lock.json
+
 COPY package.json package-lock.json ./
-# Correção: Usar o npm install
-# Instala todas as dependências, incluindo dev (necessário para tsx)
+
 RUN npm install
 
-# Estágio 3: Build/Produção
-FROM base AS production
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Expõe a porta da API
+RUN npm run build
+
+FROM node:20-alpine AS production
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+
+RUN npm install --omit=dev
+
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/.migrations ./.migrations
+
 EXPOSE 8080
 
-# Comando padrão: usa npm para rodar o script
-CMD ["npm", "run", "dev"]
+CMD ["sh", "-c", "npm run migrate:prod && npm run start"]
