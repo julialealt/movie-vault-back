@@ -21,4 +21,4 @@ COPY --from=builder /app/.migrations ./.migrations
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "npm run migrate:prod && npm run start"]
+CMD ["npm", "run", "start"]
