@@ -15,6 +15,10 @@ import { updateMovieRoute } from './routes/update-movie'
 
 const app = fastify().withTypeProvider<ZodTypeProvider>()
 
+app.get('/health', async (_, reply) => {
+  return reply.status(200).send({ status: 'ok' })
+})
+
 app.register(fastifyCors, {
   origin: env.FRONTEND_URL,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
