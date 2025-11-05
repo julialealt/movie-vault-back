@@ -7,6 +7,7 @@
     "dev": "tsx watch --env-file .env src/http/server.ts",
     "migrate": "tsx --env-file .env src/db/migrate.ts",
     "start:worker": "tsx watch --env-file .env src/worker.ts",
+    "start:worker:prod": "node dist/worker.js",
     "build": "tsc",
     "start": "node dist/http/server.js",
     "migrate:prod": "node dist/db/migrate.js"
