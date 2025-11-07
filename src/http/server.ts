@@ -24,7 +24,11 @@ app.register(fastifyCors, {
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
 })
 
-app.register(fastifyMultipart)
+app.register(fastifyMultipart, {
+  limits: {
+    fileSize: 100 * 1024 * 1024,
+  },
+})
 
 app.setValidatorCompiler(validatorCompiler)
 app.setSerializerCompiler(serializerCompiler)
